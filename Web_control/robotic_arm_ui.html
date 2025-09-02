@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6-DOF Robotic Arm Control</title>
+    <!-- Tailwind CSS CDN for easy styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter for a clean look -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light background */
+            color: #334155; /* Dark gray text */
+        }
+        /* Custom scrollbar for log area */
+        .log-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        .log-area::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 10px;
+        }
+        .log-area::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        .log-area::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        /* Style for range input (sliders) */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #cbd5e1;
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type="range"]:hover {
+            opacity: 1;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3b82f6; /* Blue thumb */
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-8">
+
+    <!-- Header Section -->
+    <header class="bg-white shadow-md rounded-xl p-4 mb-6 flex flex-col md:flex-row items-center justify-between">
+        <h1 class="text-3xl font-bold text-gray-800 mb-4 md:mb-0">6-DOF Robotic Arm Control</h1>
+        <div class="flex items-center space-x-4">
+            <div id="connectionStatus" class="flex items-center text-lg font-medium">
+                <span class="w-3 h-3 rounded-full bg-red-500 mr-2" id="statusIndicator"></span>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <!-- Removed ESP32 IP input as we're connecting to a relay now -->
+            <button id="toggleConnectionBtn"
+                    class="px-5 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105">
+                Connect to Relay
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Robot Visualization Placeholder -->
+        <section class="lg:col-span-2 bg-white shadow-md rounded-xl p-6 flex flex-col items-center justify-center">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Robot Visualization</h2>
+            <div class="w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500 text-lg">
+                <p>3D Model / Live Feed Placeholder</p>
+            </div>
+            <div class="mt-4 text-center text-gray-600">
+                <p>Current End-Effector Position:</p>
+                <p>X: <span id="currentX">0.00</span>, Y: <span id="currentY">0.00</span>, Z: <span id="currentZ">0.00</span></p>
+                <p>Roll: <span id="currentRoll">0.00</span>, Pitch: <span id="currentPitch">0.00</span>, Yaw: <span id="currentYaw">0.00</span></p>
+            </div>
+        </section>
+
+        <!-- Control Panel -->
+        <section class="lg:col-span-1 bg-white shadow-md rounded-xl p-6">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Joint Control</h2>
+
+            <!-- Joint Controls (6 DOFs) -->
+            <div id="jointControls" class="space-y-4">
+                <!-- Joint 1 (Base) -->
+                <div class="flex flex-col">
+                    <label for="joint1" class="text-lg font-medium mb-1">Joint 1 (Base): <span id="joint1Value" class="font-bold">0°</span></label>
+                    <input type="range" id="joint1" min="-180" max="180" value="0" step="1" class="w-full">
+                    <input type="number" id="joint1Input" min="-180" max="180" value="0" step="1"
+                           class="mt-2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full">
+                </div>
+                <!-- Joint 2 (Shoulder) -->
+                <div class="flex flex-col">
+                    <label for="joint2" class="text-lg font-medium mb-1">Joint 2 (Shoulder): <span id="joint2Value" class="font-bold">0°</span></label>
+                    <input type="range" id="joint2" min="-90" max="90" value="0" step="1" class="w-full">
+                    <input type="number" id="joint2Input" min="-90" max="90" value="0" step="1"
+                           class="mt-2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full">
+                </div>
+                <!-- Joint 3 (Elbow) -->
+                <div class="flex flex-col">
+                    <label for="joint3" class="text-lg font-medium mb-1">Joint 3 (Elbow): <span id="joint3Value" class="font-bold">0°</span></label>
+                    <input type="range" id="joint3" min="-90" max="90" value="0" step="1" class="w-full">
+                    <input type="number" id="joint3Input" min="-90" max="90" value="0" step="1"
+                           class="mt-2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full">
+                </div>
+                <!-- Joint 4 (Wrist Roll) -->
+                <div class="flex flex-col">
+                    <label for="joint4" class="text-lg font-medium mb-1">Joint 4 (Wrist Roll): <span id="joint4Value" class="font-bold">0°</span></label>
+                    <input type="range" id="joint4" min="-180" max="180" value="0" step="1" class="w-full">
+                    <input type="number" id="joint4Input" min="-180" max="180" value="0" step="1"
+                           class="mt-2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full">
+                </div>
+                <!-- Joint 5 (Wrist Pitch) -->
+                <div class="flex flex-col">
+                    <label for="joint5" class="text-lg font-medium mb-1">Joint 5 (Wrist Pitch): <span id="joint5Value" class="font-bold">0°</span></label>
+                    <input type="range" id="joint5" min="-90" max="90" value="0" step="1" class="w-full">
+                    <input type="number" id="joint5Input" min="-90" max="90" value="0" step="1"
+                           class="mt-2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full">
+                </div>
+                <!-- Joint 6 (Wrist Yaw / Gripper Rotation) -->
+                <div class="flex flex-col">
+                    <label for="joint6" class="text-lg font-medium mb-1">Joint 6 (Wrist Yaw): <span id="joint6Value" class="font-bold">0°</span></label>
+                    <input type="range" id="joint6" min="-180" max="180" value="0" step="1" class="w-full">
+                    <input type="number" id="joint6Input" min="-180" max="180" value="0" step="1"
+                           class="mt-2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full">
+                </div>
+
+                <!-- Gripper Control -->
+                <div class="flex flex-col pt-4 border-t border-gray-200 mt-4">
+                    <label for="gripper" class="text-lg font-medium mb-1">Gripper: <span id="gripperValue" class="font-bold">0%</span></label>
+                    <input type="range" id="gripper" min="0" max="100" value="0" step="1" class="w-full">
+                    <div class="flex justify-between mt-2 space-x-2">
+                        <button id="openGripperBtn"
+                                class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg shadow-md hover:bg-green-600 transition duration-300 ease-in-out transform hover:scale-105">
+                            Open
+                        </button>
+                        <button id="closeGripperBtn"
+                                class="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600 transition duration-300 ease-in-out transform hover:scale-105">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Action Buttons & Log -->
+        <section class="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Action Buttons -->
+            <div class="bg-white shadow-md rounded-xl p-6">
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Actions & Presets</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <button id="moveArmBtn"
+                            class="px-6 py-3 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105 text-lg font-semibold">
+                        Move Arm
+                    </button>
+                    <button id="stopArmBtn"
+                            class="px-6 py-3 bg-red-600 text-white rounded-lg shadow-md hover:bg-red-700 transition duration-300 ease-in-out transform hover:scale-105 text-lg font-semibold">
+                        Stop Arm (Emergency)
+                    </button>
+                    <button id="goHomeBtn"
+                            class="px-6 py-3 bg-indigo-600 text-white rounded-lg shadow-md hover:bg-indigo-700 transition duration-300 ease-in-out transform hover:scale-105 text-lg font-semibold">
+                        Go Home
+                    </button>
+                    <button id="resetJointsBtn"
+                            class="px-6 py-3 bg-gray-600 text-white rounded-lg shadow-md hover:bg-gray-700 transition duration-300 ease-in-out transform hover:scale-105 text-lg font-semibold">
+                        Reset Joint Inputs
+                    </button>
+                </div>
+
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <h3 class="text-xl font-semibold text-gray-700 mb-3">Presets</h3>
+                    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+                        <input type="text" id="presetNameInput" placeholder="Preset Name"
+                               class="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <button id="savePresetBtn"
+                                class="px-5 py-2 bg-purple-600 text-white rounded-lg shadow-md hover:bg-purple-700 transition duration-300 ease-in-out transform hover:scale-105">
+                            Save Current
+                        </button>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <select id="presetSelect"
+                                class="flex-grow p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                            <option value="">Select a preset</option>
+                        </select>
+                        <button id="loadPresetBtn"
+                                class="px-5 py-2 bg-teal-600 text-white rounded-lg shadow-md hover:bg-teal-700 transition duration-300 ease-in-out transform hover:scale-105">
+                            Load
+                        </button>
+                        <button id="goToPresetBtn"
+                                class="px-5 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 transition duration-300 ease-in-out transform hover:scale-105">
+                            Go To
+                        </button>
+                        <button id="deletePresetBtn"
+                                class="px-5 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600 transition duration-300 ease-in-out transform hover:scale-105">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terminal / Log -->
+            <div class="bg-white shadow-md rounded-xl p-6 flex flex-col">
+                <h2 class="text-2xl font-semibold text-gray-700 mb-4">Terminal Log</h2>
+                <div id="logArea" class="log-area flex-grow bg-gray-800 text-gray-100 p-4 rounded-md text-sm overflow-y-auto h-64 md:h-auto">
+                    <p class="text-gray-400">Waiting for connection...</p>
+                </div>
+                <button id="clearLogBtn"
+                        class="mt-4 px-4 py-2 bg-gray-500 text-white rounded-lg shadow-md hover:bg-gray-600 transition duration-300 ease-in-out transform hover:scale-105 self-end">
+                    Clear Log
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Custom Message Box (for alerts/confirms) -->
+    <div id="messageBox" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full text-center">
+            <p id="messageBoxText" class="text-lg font-semibold text-gray-800 mb-4"></p>
+            <div class="flex justify-center space-x-4">
+                <button id="messageBoxOkBtn" class="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300">OK</button>
+                <button id="messageBoxCancelBtn" class="px-5 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition duration-300 hidden">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // DOM Elements
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        // const esp32IpInput = document.getElementById('esp32IpInput'); // Removed for relay
+        const toggleConnectionBtn = document.getElementById('toggleConnectionBtn');
+        const logArea = document.getElementById('logArea');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+        const moveArmBtn = document.getElementById('moveArmBtn');
+        const stopArmBtn = document.getElementById('stopArmBtn');
+        const goHomeBtn = document.getElementById('goHomeBtn');
+        const resetJointsBtn = document.getElementById('resetJointsBtn');
+        const openGripperBtn = document.getElementById('openGripperBtn');
+        const closeGripperBtn = document.getElementById('closeGripperBtn');
+        const savePresetBtn = document.getElementById('savePresetBtn');
+        const loadPresetBtn = document.getElementById('loadPresetBtn');
+        const goToPresetBtn = document.getElementById('goToPresetBtn');
+        const deletePresetBtn = document.getElementById('deletePresetBtn');
+        const presetNameInput = document.getElementById('presetNameInput');
+        const presetSelect = document.getElementById('presetSelect');
+
+        // Message Box Elements
+        const messageBox = document.getElementById('messageBox');
+        const messageBoxText = document.getElementById('messageBoxText');
+        const messageBoxOkBtn = document.getElementById('messageBoxOkBtn');
+        const messageBoxCancelBtn = document.getElementById('messageBoxCancelBtn');
+
+        // Joint control elements (arrays for easier iteration)
+        const jointSliders = [];
+        const jointInputs = [];
+        const jointValues = [];
+        for (let i = 1; i <= 6; i++) {
+            jointSliders.push(document.getElementById(`joint${i}`));
+            jointInputs.push(document.getElementById(`joint${i}Input`));
+            jointValues.push(document.getElementById(`joint${i}Value`));
+        }
+        const gripperSlider = document.getElementById('gripper');
+        const gripperValueDisplay = document.getElementById('gripperValue');
+
+        // End-effector position displays
+        const currentX = document.getElementById('currentX');
+        const currentY = document.getElementById('currentY');
+        const currentZ = document.getElementById('currentZ');
+        const currentRoll = document.getElementById('currentRoll');
+        const currentPitch = document.getElementById('currentPitch');
+        const currentYaw = document.getElementById('currentYaw');
+
+        let ws = null; // WebSocket instance
+        let isConnecting = false; // Flag to prevent multiple connection attempts
+
+        // --- IMPORTANT: Replace with your Render.com WebSocket Relay URL ---
+        // Get this URL from your Render.com service dashboard after deployment.
+        // Make sure to use 'wss://' for secure WebSocket if Render provides it (recommended for production).
+        // For testing, 'ws://' might work if Render defaults to HTTP, but 'wss://' is standard.
+        // Also, append '?type=ui' to identify this client to the relay.
+        const WEBSOCKET_RELAY_URL = "wss://robotic-arm-relay.onrender.com/?type=ui"; // <<< REPLACE THIS!
+
+        // --- Utility Functions ---
+
+        /**
+         * Displays a custom message box.
+         * @param {string} message - The message to display.
+         * @param {boolean} isConfirm - If true, shows a "Cancel" button.
+         * @returns {Promise<boolean>} - Resolves true if OK is clicked, false if Cancel.
+         */
+        function showMessageBox(message, isConfirm = false) {
+            return new Promise((resolve) => {
+                messageBoxText.textContent = message;
+                messageBoxCancelBtn.classList.toggle('hidden', !isConfirm);
+                messageBox.classList.remove('hidden');
+
+                const handleOk = () => {
+                    messageBox.classList.add('hidden');
+                    messageBoxOkBtn.removeEventListener('click', handleOk);
+                    messageBoxCancelBtn.removeEventListener('click', handleCancel);
+                    resolve(true);
+                };
+
+                const handleCancel = () => {
+                    messageBox.classList.add('hidden');
+                    messageBoxOkBtn.removeEventListener('click', handleOk);
+                    messageBoxCancelBtn.removeEventListener('click', handleCancel);
+                    resolve(false);
+                };
+
+                messageBoxOkBtn.addEventListener('click', handleOk);
+                messageBoxCancelBtn.addEventListener('click', handleCancel);
+            });
+        }
+
+        /**
+         * Appends a message to the log area.
+         * @param {string} message - The message to log.
+         * @param {string} type - 'info', 'error', 'success', etc. for styling.
+         */
+        function logMessage(message, type = 'info') {
+            const p = document.createElement('p');
+            p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            if (type === 'error') {
+                p.classList.add('text-red-400');
+            } else if (type === 'success') {
+                p.classList.add('text-green-400');
+            } else if (type === 'warning') {
+                p.classList.add('text-yellow-400');
+            } else {
+                p.classList.add('text-gray-200');
+            }
+            logArea.appendChild(p);
+            logArea.scrollTop = logArea.scrollHeight; // Auto-scroll to bottom
+        }
+
+        /**
+         * Updates the connection status UI.
+         * @param {string} status - 'connected', 'disconnected', 'connecting'.
+         */
+        function updateConnectionStatus(status) {
+            statusText.textContent = status.charAt(0).toUpperCase() + status.slice(1); // Capitalize first letter
+            statusIndicator.classList.remove('bg-green-500', 'bg-red-500', 'bg-yellow-500');
+            toggleConnectionBtn.textContent = 'Connect to Relay'; // Default button text
+
+            if (status === 'connected') {
+                statusIndicator.classList.add('bg-green-500');
+                toggleConnectionBtn.textContent = 'Disconnect from Relay';
+                toggleConnectionBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                toggleConnectionBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else if (status === 'disconnected') {
+                statusIndicator.classList.add('bg-red-500');
+                toggleConnectionBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                toggleConnectionBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            } else if (status === 'connecting') {
+                statusIndicator.classList.add('bg-yellow-500');
+                toggleConnectionBtn.textContent = 'Connecting...';
+                toggleConnectionBtn.disabled = true; // Disable button during connection attempt
+            }
+            toggleConnectionBtn.disabled = isConnecting; // Ensure button is disabled if connecting
+        }
+
+        /**
+         * Connects to the WebSocket relay server.
+         */
+        function connectWebSocket() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                logMessage('Already connected to relay.', 'info');
+                return;
+            }
+
+            isConnecting = true;
+            updateConnectionStatus('connecting');
+            logMessage(`Attempting to connect to relay: ${WEBSOCKET_RELAY_URL} ...`, 'info');
+
+            try {
+                ws = new WebSocket(WEBSOCKET_RELAY_URL);
+
+                ws.onopen = () => {
+                    logMessage('WebSocket connected to relay!', 'success');
+                    updateConnectionStatus('connected');
+                    isConnecting = false;
+                };
+
+                ws.onmessage = (event) => {
+                    // logMessage(`Received: ${event.data}`, 'info'); // Uncomment for verbose logging
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleWebSocketMessage(data);
+                    } catch (e) {
+                        logMessage(`Failed to parse JSON from relay: ${event.data}`, 'error');
+                    }
+                };
+
+                ws.onclose = (event) => {
+                    logMessage(`WebSocket disconnected from relay: Code ${event.code}, Reason: ${event.reason}`, 'warning');
+                    updateConnectionStatus('disconnected');
+                    isConnecting = false;
+                    // Optional: Attempt to reconnect after a delay
+                    // setTimeout(connectWebSocket, 5000);
+                };
+
+                ws.onerror = (error) => {
+                    logMessage(`WebSocket error with relay: ${error.message || 'Unknown error'}`, 'error');
+                    updateConnectionStatus('disconnected');
+                    isConnecting = false;
+                };
+            } catch (e) {
+                logMessage(`Failed to create WebSocket: ${e.message}`, 'error');
+                updateConnectionStatus('disconnected');
+                isConnecting = false;
+            }
+        }
+
+        /**
+         * Disconnects from the WebSocket relay server.
+         */
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+                logMessage('WebSocket disconnected from relay by user.', 'info');
+            }
+            updateConnectionStatus('disconnected');
+        }
+
+        /**
+         * Sends a JSON message over WebSocket if connected.
+         * @param {object} message - The JSON object to send.
+         */
+        function sendWebSocketMessage(message) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const jsonMessage = JSON.stringify(message);
+                ws.send(jsonMessage);
+                // logMessage(`Sent: ${jsonMessage}`, 'info'); // Uncomment for verbose logging
+            } else {
+                logMessage('WebSocket not connected to relay. Cannot send message.', 'error');
+                showMessageBox('WebSocket not connected to relay. Please connect first.', false);
+            }
+        }
+
+        /**
+         * Handles incoming WebSocket messages from the ESP32 (via the relay).
+         * @param {object} data - Parsed JSON data from the ESP32.
+         */
+        function handleWebSocketMessage(data) {
+            if (data.type === 'robot_status') {
+                // Update current joint values and end-effector position
+                if (data.joint1_current !== undefined) jointValues[0].textContent = `${data.joint1_current.toFixed(1)}°`;
+                if (data.joint2_current !== undefined) jointValues[1].textContent = `${data.joint2_current.toFixed(1)}°`;
+                if (data.joint3_current !== undefined) jointValues[2].textContent = `${data.joint3_current.toFixed(1)}°`;
+                if (data.joint4_current !== undefined) jointValues[3].textContent = `${data.joint4_current.toFixed(1)}°`;
+                if (data.joint5_current !== undefined) jointValues[4].textContent = `${data.joint5_current.toFixed(1)}°`;
+                if (data.joint6_current !== undefined) jointValues[5].textContent = `${data.joint6_current.toFixed(1)}°`;
+                if (data.gripper_current !== undefined) gripperValueDisplay.textContent = `${data.gripper_current.toFixed(0)}%`;
+
+                // Update end-effector coordinates (if provided by ESP32)
+                currentX.textContent = data.x_current !== undefined ? data.x_current.toFixed(2) : 'N/A';
+                currentY.textContent = data.y_current !== undefined ? data.y_current.toFixed(2) : 'N/A';
+                currentZ.textContent = data.z_current !== undefined ? data.z_current.toFixed(2) : 'N/A';
+                currentRoll.textContent = data.roll_current !== undefined ? data.roll_current.toFixed(2) : 'N/A';
+                currentPitch.textContent = data.pitch_current !== undefined ? data.pitch_current.toFixed(2) : 'N/A';
+                currentYaw.textContent = data.yaw_current !== undefined ? data.yaw_current.toFixed(2) : 'N/A';
+
+            } else if (data.type === 'log') {
+                logMessage(data.message, data.level || 'info');
+            } else if (data.type === 'error') {
+                logMessage(`ERROR: ${data.message}`, 'error');
+            }
+            // Add more message types as needed (e.g., 'command_ack', 'limit_reached')
+        }
+
+        // --- Event Listeners ---
+
+        // Toggle Connection Button
+        toggleConnectionBtn.addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                disconnectWebSocket();
+            } else {
+                connectWebSocket();
+            }
+        });
+
+        // Clear Log Button
+        clearLogBtn.addEventListener('click', () => {
+            logArea.innerHTML = '';
+            logMessage('Log cleared.', 'info');
+        });
+
+        // Joint Slider and Input synchronization
+        jointSliders.forEach((slider, index) => {
+            const input = jointInputs[index];
+            const valueDisplay = jointValues[index];
+
+            // Slider to Input & Display
+            slider.addEventListener('input', () => {
+                input.value = slider.value;
+                valueDisplay.textContent = `${slider.value}°`;
+            });
+
+            // Input to Slider & Display
+            input.addEventListener('change', () => {
+                // Ensure input value is within slider's min/max
+                let val = parseFloat(input.value);
+                if (isNaN(val)) val = 0;
+                val = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), val));
+                input.value = val;
+                slider.value = val;
+                valueDisplay.textContent = `${val}°`;
+            });
+        });
+
+        // Gripper Slider and Input synchronization
+        gripperSlider.addEventListener('input', () => {
+            gripperValueDisplay.textContent = `${gripperSlider.value}%`;
+        });
+
+        // Move Arm Button
+        moveArmBtn.addEventListener('click', () => {
+            const jointAngles = {};
+            for (let i = 0; i < 6; i++) {
+                jointAngles[`joint${i + 1}`] = parseFloat(jointSliders[i].value);
+            }
+            const message = {
+                command: 'move_joint',
+                ...jointAngles,
+                speed: 100 // Example speed, could add a speed slider
+            };
+            sendWebSocketMessage(message);
+        });
+
+        // Stop Arm Button
+        stopArmBtn.addEventListener('click', async () => {
+            const confirmed = await showMessageBox('Are you sure you want to send an EMERGENCY STOP command?', true);
+            if (confirmed) {
+                sendWebSocketMessage({ command: 'stop' });
+            }
+        });
+
+        // Go Home Button
+        goHomeBtn.addEventListener('click', () => {
+            sendWebSocketMessage({ command: 'go_home' });
+            // Optionally, update UI to reflect home position immediately
+            jointSliders.forEach(slider => slider.value = 0);
+            jointInputs.forEach(input => input.value = 0);
+            jointValues.forEach(display => display.textContent = '0°');
+            gripperSlider.value = 0;
+            gripperValueDisplay.textContent = '0%';
+        });
+
+        // Reset Joint Inputs Button
+        resetJointsBtn.addEventListener('click', () => {
+            jointSliders.forEach(slider => slider.value = 0);
+            jointInputs.forEach(input => input.value = 0);
+            jointValues.forEach(display => display.textContent = '0°');
+            gripperSlider.value = 0;
+            gripperValueDisplay.textContent = '0%';
+            logMessage('Joint inputs reset to 0.', 'info');
+        });
+
+        // Gripper Open/Close Buttons
+        openGripperBtn.addEventListener('click', () => {
+            gripperSlider.value = 100; // Assuming 100 is fully open
+            gripperValueDisplay.textContent = '100%';
+            sendWebSocketMessage({ command: 'set_gripper', value: 100 });
+        });
+
+        closeGripperBtn.addEventListener('click', () => {
+            gripperSlider.value = 0; // Assuming 0 is fully closed
+            gripperValueDisplay.textContent = '0%';
+            sendWebSocketMessage({ command: 'set_gripper', value: 0 });
+        });
+
+        // --- Preset Management ---
+
+        // Load presets from Local Storage on page load
+        function loadPresets() {
+            const presets = JSON.parse(localStorage.getItem('roboticArmPresets') || '{}');
+            presetSelect.innerHTML = '<option value="">Select a preset</option>'; // Clear existing options
+            for (const name in presets) {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                presetSelect.appendChild(option);
+            }
+        }
+
+        // Save Current Position Preset
+        savePresetBtn.addEventListener('click', async () => {
+            const presetName = presetNameInput.value.trim();
+            if (!presetName) {
+                showMessageBox('Please enter a name for the preset.', false);
+                return;
+            }
+
+            const presets = JSON.parse(localStorage.getItem('roboticArmPresets') || '{}');
+            if (presets[presetName]) {
+                const confirmed = await showMessageBox(`Preset "${presetName}" already exists. Overwrite?`, true);
+                if (!confirmed) {
+                    return;
+                }
+            }
+
+            const currentJoints = {};
+            for (let i = 0; i < 6; i++) {
+                currentJoints[`joint${i + 1}`] = parseFloat(jointSliders[i].value);
+            }
+            currentJoints.gripper = parseFloat(gripperSlider.value);
+
+            presets[presetName] = currentJoints;
+            localStorage.setItem('roboticArmPresets', JSON.stringify(presets));
+            loadPresets(); // Refresh dropdown
+            presetNameInput.value = ''; // Clear input
+            logMessage(`Preset "${presetName}" saved.`, 'success');
+        });
+
+        // Load Preset to UI inputs
+        loadPresetBtn.addEventListener('click', () => {
+            const selectedPresetName = presetSelect.value;
+            if (!selectedPresetName) {
+                showMessageBox('Please select a preset to load.', false);
+                return;
+            }
+
+            const presets = JSON.parse(localStorage.getItem('roboticArmPresets') || '{}');
+            const preset = presets[selectedPresetName];
+
+            if (preset) {
+                for (let i = 0; i < 6; i++) {
+                    const jointVal = preset[`joint${i + 1}`];
+                    if (jointVal !== undefined) {
+                        jointSliders[i].value = jointVal;
+                        jointInputs[i].value = jointVal;
+                        jointValues[i].textContent = `${jointVal}°`;
+                    }
+                }
+                if (preset.gripper !== undefined) {
+                    gripperSlider.value = preset.gripper;
+                    gripperValueDisplay.textContent = `${preset.gripper}%`;
+                }
+                logMessage(`Preset "${selectedPresetName}" loaded to UI.`, 'info');
+            } else {
+                logMessage(`Preset "${selectedPresetName}" not found.`, 'error');
+            }
+        });
+
+        // Go To Preset (sends command to arm)
+        goToPresetBtn.addEventListener('click', () => {
+            const selectedPresetName = presetSelect.value;
+            if (!selectedPresetName) {
+                showMessageBox('Please select a preset to send to the arm.', false);
+                return;
+            }
+
+            const presets = JSON.parse(localStorage.getItem('roboticArmPresets') || '{}');
+            const preset = presets[selectedPresetName];
+
+            if (preset) {
+                // Construct message for ESP32 based on loaded preset
+                const message = {
+                    command: 'move_preset', // Custom command for ESP32 to handle presets
+                    name: selectedPresetName, // Send name for ESP32 to identify
+                    ...preset // Send all joint values
+                };
+                sendWebSocketMessage(message);
+                logMessage(`Sending arm to preset "${selectedPresetName}".`, 'info');
+            } else {
+                logMessage(`Preset "${selectedPresetName}" not found.`, 'error');
+            }
+        });
+
+        // Delete Preset
+        deletePresetBtn.addEventListener('click', async () => {
+            const selectedPresetName = presetSelect.value;
+            if (!selectedPresetName) {
+                showMessageBox('Please select a preset to delete.', false);
+                return;
+            }
+
+            const confirmed = await showMessageBox(`Are you sure you want to delete preset "${selectedPresetName}"?`, true);
+            if (confirmed) {
+                const presets = JSON.parse(localStorage.getItem('roboticArmPresets') || '{}');
+                delete presets[selectedPresetName];
+                localStorage.setItem('roboticArmPresets', JSON.stringify(presets));
+                loadPresets(); // Refresh dropdown
+                logMessage(`Preset "${selectedPresetName}" deleted.`, 'success');
+            }
+        });
+
+        // Initial setup on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateConnectionStatus('disconnected');
+            loadPresets(); // Load presets when the page loads
+            logMessage('UI loaded. Connect to the Render.com relay.', 'info');
+        });
+
+    </script>
+</body>
+</html>
