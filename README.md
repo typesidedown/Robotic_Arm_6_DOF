@@ -1,7 +1,15 @@
+[![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![OpenCV](https://img.shields.io/badge/OpenCV-4.x-5C3EE8?logo=opencv&logoColor=white)](https://opencv.org/)
+[![MediaPipe](https://img.shields.io/badge/MediaPipe-0.10.x-00BFA5?logo=google&logoColor=white)](https://developers.google.com/mediapipe)
+[![Arduino/ESP32](https://img.shields.io/badge/Arduino-ESP32-00979D?logo=arduino&logoColor=white)](https://www.arduino.cc/)
+[![Node.js](https://img.shields.io/badge/Node.js-18.x-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+<!-- [![WebSocket](https://img.shields.io/badge/WebSocket-Real-time-010101?logo=socket.io&logoColor=white)](https://developer.mozilla.org/docs/Web/API/WebSockets_API) -->
+
 # 6 DOF Robotic Arm Control System
 
 A comprehensive robotic arm control system featuring multiple input methods including gesture recognition, joystick control, automated pick-and-place operations, and web-based remote control.
 website link : https://robotic-arm-relay.onrender.com
+
 ## Features
 
 - **6 Degrees of Freedom (DOF)**: Full control over base rotation, shoulder, elbow, wrist roll, wrist pitch, and wrist yaw
@@ -13,6 +21,8 @@ website link : https://robotic-arm-relay.onrender.com
 - **Computer Vision Integration**: ArUco marker pose estimation for object tracking
 - **Real-time Communication**: Serial and WebSocket communication protocols
 - **Modular Design**: Separate firmware and software for different control modes
+
+![Robotic arm Image](Images/robotic_arm.jpeg)
 
 ## Project Structure
 
@@ -54,15 +64,6 @@ Robotic_Arm/
 - Power supply for servos (typically 5-6V)
 - ArUco markers (for pose estimation)
 
-### Servo Pin Configuration
-
-**Gesture Control ESP32:**
-- Base: GPIO 5
-- Shoulder: GPIO 4
-- Elbow: GPIO 2
-- Wrist Roll: GPIO 22
-- Wrist Pitch: GPIO 19
-- Wrist Yaw: GPIO 18
 
 ## Software Requirements
 
